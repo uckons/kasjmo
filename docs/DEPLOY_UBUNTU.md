@@ -34,6 +34,7 @@ Edit `.env`:
 - PORT=5800
 - BYPASS_CAPTCHA=false
 - TURNSTILE_SECRET_KEY=...
+- CLIENT_DIST_PATH=/var/www/kasjmo/client/dist
 
 Install and run migration:
 ```bash

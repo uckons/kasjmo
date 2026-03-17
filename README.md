@@ -106,6 +106,7 @@ For production:
 - set `BYPASS_CAPTCHA=false`
 - set `TURNSTILE_SECRET_KEY`
 - set frontend `VITE_TURNSTILE_SITE_KEY`
+- optional: set `CLIENT_DIST_PATH` (contoh: `/var/www/kasjmo/client/dist`) bila backend tidak menemukan folder build frontend otomatis
 
 ## Scripts
 ### Server
