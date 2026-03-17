@@ -60,6 +60,8 @@ npm run build
 
 Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket build tool seperti `vite` ikut terpasang.
 
+> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+
 ## PM2
 ```bash
 sudo npm install -g pm2

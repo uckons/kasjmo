@@ -83,6 +83,8 @@ npm run build
 
 Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` memastikan `vite` tersedia saat build.
 
+> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+
 Start backend:
 ```bash
 cd ../server
