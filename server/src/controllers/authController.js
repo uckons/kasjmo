@@ -22,7 +22,7 @@ export async function login(req, res) {
     const captchaValid = await validateCaptcha(captchaToken);
     if (!captchaValid) return res.status(400).json({ message: 'Captcha validation failed' });
 
-    const result = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    const result = await query('SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL', [email.toLowerCase()]);
     const user = result.rows[0];
 
     if (!user || !user.is_active) return res.status(401).json({ message: 'Invalid credentials' });
@@ -53,7 +53,7 @@ export async function requestPasswordReset(req, res) {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
-    const userResult = await query('SELECT id, email, full_name FROM users WHERE email = $1 AND is_active = true', [email.toLowerCase()]);
+    const userResult = await query('SELECT id, email, full_name FROM users WHERE email = $1 AND is_active = true AND deleted_at IS NULL', [email.toLowerCase()]);
     const user = userResult.rows[0];
 
     if (user) {

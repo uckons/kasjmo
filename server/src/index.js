@@ -56,7 +56,7 @@ app.get('/assets/:file', (req, res) => res.status(404).type('text/plain').send('
 app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates, distChecks }));
 app.use(errorHandler);
 async function runMigrations() {
-await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, failed_login_attempts INTEGER NOT NULL DEFAULT 0, locked_until TIMESTAMP NULL, last_login_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, failed_login_attempts INTEGER NOT NULL DEFAULT 0, locked_until TIMESTAMP NULL, last_login_at TIMESTAMP NULL, deleted_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
 await query(`CREATE TABLE IF NOT EXISTS transactions (id SERIAL PRIMARY KEY, cash_type VARCHAR(30) NOT NULL CHECK (cash_type IN ('kas_kecil', 'kas_besar')), flow VARCHAR(20) NOT NULL CHECK (flow IN ('income', 'expense')), amount NUMERIC(14,2) NOT NULL, category VARCHAR(100) NOT NULL, description TEXT, transaction_date DATE NOT NULL, status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'pending_approval', 'approved', 'rejected')), created_by INTEGER NOT NULL REFERENCES users(id), proof_file_path TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
 await query(`CREATE TABLE IF NOT EXISTS approvals (id SERIAL PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, approver_id INTEGER NOT NULL REFERENCES users(id), decision VARCHAR(20) NOT NULL CHECK (decision IN ('approved', 'rejected')), comment TEXT, approved_at TIMESTAMP NOT NULL DEFAULT NOW(), UNIQUE(transaction_id, approver_id));`);
 await query(`CREATE TABLE IF NOT EXISTS audit_logs (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), action VARCHAR(100) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id INTEGER, detail JSONB, ip_address VARCHAR(100), created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
@@ -65,6 +65,7 @@ await query(`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON passwo
 await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
 await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP NULL;`);
 await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP NULL;`);
+await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;`);
 await query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS proof_file_path TEXT;`);
 
 console.log('Migrations completed');
