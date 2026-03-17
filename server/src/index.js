@@ -76,5 +76,33 @@ const admin = await query(`SELECT id FROM users WHERE email='admin@jakartamax.lo
 if (txCount.rows[0].total === 0) { const sample = [['kas_kecil', 'income', 2500000, 'Donasi', 'Iuran komunitas', '2026-03-01', 'approved', bendahara.rows[0].id], ['kas_kecil', 'expense', 450000, 'Konsumsi', 'Kopi dan snack rapat', '2026-03-02', 'approved', bendahara.rows[0].id], ['kas_besar', 'income', 12000000, 'Sponsorship', 'Sponsor event touring', '2026-03-03', 'approved', admin.rows[0].id], ['kas_besar', 'expense', 3500000, 'Event', 'DP venue gathering', '2026-03-04', 'pending_approval', bendahara.rows[0].id], ['kas_besar', 'expense', 1250000, 'Merchandise', 'Cetak banner komunitas', '2026-03-05', 'approved', admin.rows[0].id]]; for (const item of sample) { await query(`INSERT INTO transactions (cash_type, flow, amount, category, description, transaction_date, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, item); } }
 console.log('Seed completed');
 }
-async function main() { const mode = process.argv[2]; try { if (mode === '--migrate') { await runMigrations(); await pool.end(); process.exit(0); } if (mode === '--seed') { await runMigrations(); await seed(); await pool.end(); process.exit(0); } await pool.query('SELECT 1'); app.listen(port, () => { console.log(`Server running on http://localhost:${port}`); }); } catch (error) { console.error(error); process.exit(1); } }
+async function main() {
+  const mode = process.argv[2];
+  try {
+    if (mode === '--migrate') {
+      await runMigrations();
+      await pool.end();
+      process.exit(0);
+    }
+
+    if (mode === '--seed') {
+      await runMigrations();
+      await seed();
+      await pool.end();
+      process.exit(0);
+    }
+
+    const autoMigrate = process.env.AUTO_MIGRATE_ON_START !== 'false';
+    if (autoMigrate) await runMigrations();
+
+    await pool.query('SELECT 1');
+    app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+}
+
 main();

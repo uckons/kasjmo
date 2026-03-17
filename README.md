@@ -113,6 +113,7 @@ For local UAT, backend supports:
 For production:
 - set `BYPASS_CAPTCHA=false`
 - set `TURNSTILE_SECRET_KEY`
+- `AUTO_MIGRATE_ON_START=true` (default) agar schema otomatis disiapkan saat server start.
 - set frontend `VITE_TURNSTILE_SITE_KEY`
 - optional: set `CLIENT_DIST_PATH` (contoh: `/var/www/kasjmo/client/dist`) bila backend tidak menemukan folder build frontend otomatis
 
