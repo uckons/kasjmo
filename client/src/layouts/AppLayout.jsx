@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, FileText, ShieldCheck, History, Users, LogOut } from 'lucide-react';
+import { BarChart3, FileText, ShieldCheck, History, Users, LogOut, Tags } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AppLayout() {
@@ -10,6 +10,7 @@ export default function AppLayout() {
   const navItems = [
     { to: '/', label: 'Dashboard', icon: BarChart3 },
     ...(isViewer ? [] : [{ to: '/transactions', label: 'Transaksi', icon: FileText }]),
+    ...(user?.role === 'admin' || user?.role === 'bendahara' ? [{ to: '/categories', label: 'Kategori', icon: Tags }] : []),
     { to: '/reports', label: 'Laporan', icon: ShieldCheck },
     ...(!isViewer && user?.role !== 'approver' ? [{ to: '/audit-logs', label: 'Audit Log', icon: History }] : []),
     ...(user?.role === 'admin' ? [{ to: '/users', label: 'Users', icon: Users }] : [])
