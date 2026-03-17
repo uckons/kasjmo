@@ -17,6 +17,10 @@ A UAT-ready full stack web application for **Kas Kecil** and **Kas Besar** manag
 - Audit log
 - Report filters
 - Export report to **XLSX** and **PDF**
+- File upload for transaction proof (JPG/PNG/PDF)
+- Login rate limiting + account lockout after repeated failures
+- Password reset flow (request token + confirm reset)
+- Notification hooks for email/WhatsApp events
 - UAT seed users
 - Responsive modern UI
 - Static frontend served by backend in production mode
@@ -125,11 +129,22 @@ For production:
 - `npm run preview`
 
 ## Important note
-This project is a strong **UAT baseline**. It is not yet a final hardened enterprise production release. Before production go-live, add:
-- file upload for transaction proof
-- rate limiting and account lockout
-- password reset flow
-- email / WhatsApp notifications
-- backup/restore strategy
-- stronger secret management
-- automated tests and CI/CD
+This project remains a UAT baseline, but now includes core hardening controls for uploads, auth protection, password reset, notifications, backup scripts, secret validation, and CI automation.
+
+
+## Backup and restore
+Use the included scripts (require `pg_dump`/`pg_restore`):
+
+```bash
+export DB_HOST=localhost DB_PORT=5432 DB_NAME=jmo_finance DB_USER=postgres DB_PASSWORD=postgres
+./scripts/backup.sh
+./scripts/restore.sh backups/<file>.dump
+```
+
+## Secret management hardening
+- Use `server/.env.example` as baseline and store real secrets in a vault (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault).
+- The backend now validates required env vars and enforces a strong `JWT_SECRET` in production.
+
+## Automated tests and CI/CD
+- Backend unit tests: `cd server && npm test`
+- GitHub Actions workflow: `.github/workflows/ci.yml` (runs server tests + client build)
