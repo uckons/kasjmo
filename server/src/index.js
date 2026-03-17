@@ -13,14 +13,18 @@ import transactionRoutes from './routes/transactionRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 import { authRequired } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { pool, query } from './config/db.js';
 import { hashPassword } from './utils/hash.js';
+import { validateEnv } from './config/env.js';
+validateEnv();
 const app = express(); const port = Number(process.env.PORT || 5800); const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
 app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", 'https://challenges.cloudflare.com'], scriptSrcElem: ["'self'", 'https://challenges.cloudflare.com'], connectSrc: ["'self'", 'https://challenges.cloudflare.com'], frameSrc: ["'self'", 'https://challenges.cloudflare.com'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'], } } })); app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' })); app.use(express.json()); app.use(morgan('dev'));
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
-app.use('/api/auth', authRoutes); app.use('/api/dashboard', authRequired, dashboardRoutes); app.use('/api/transactions', authRequired, transactionRoutes); app.use('/api/reports', authRequired, reportRoutes); app.use('/api/audit-logs', authRequired, auditRoutes); app.use('/api/users', authRequired, userRoutes);
+app.use('/api/auth', authRoutes); app.use('/api/dashboard', authRequired, dashboardRoutes); app.use('/api/transactions', authRequired, transactionRoutes); app.use('/api/reports', authRequired, reportRoutes); app.use('/api/audit-logs', authRequired, auditRoutes); app.use('/api/users', authRequired, userRoutes); app.use('/api/categories', authRequired, categoryRoutes);
 const distCandidates = [
 process.env.CLIENT_DIST_PATH,
 path.resolve(__dirname, '../../client/dist'),
@@ -53,18 +57,77 @@ app.get('/assets/:file', (req, res) => res.status(404).type('text/plain').send('
 app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates, distChecks }));
 app.use(errorHandler);
 async function runMigrations() {
-await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
-await query(`CREATE TABLE IF NOT EXISTS transactions (id SERIAL PRIMARY KEY, cash_type VARCHAR(30) NOT NULL CHECK (cash_type IN ('kas_kecil', 'kas_besar')), flow VARCHAR(20) NOT NULL CHECK (flow IN ('income', 'expense')), amount NUMERIC(14,2) NOT NULL, category VARCHAR(100) NOT NULL, description TEXT, transaction_date DATE NOT NULL, status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'pending_approval', 'approved', 'rejected')), created_by INTEGER NOT NULL REFERENCES users(id), created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver', 'viewer')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, failed_login_attempts INTEGER NOT NULL DEFAULT 0, locked_until TIMESTAMP NULL, last_login_at TIMESTAMP NULL, deleted_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE TABLE IF NOT EXISTS transactions (id SERIAL PRIMARY KEY, cash_type VARCHAR(30) NOT NULL CHECK (cash_type IN ('kas_kecil', 'kas_besar')), flow VARCHAR(20) NOT NULL CHECK (flow IN ('income', 'expense')), amount NUMERIC(14,2) NOT NULL, category VARCHAR(100) NOT NULL, description TEXT, transaction_date DATE NOT NULL, status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'pending_approval', 'approved', 'rejected')), created_by INTEGER NOT NULL REFERENCES users(id), proof_file_path TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
 await query(`CREATE TABLE IF NOT EXISTS approvals (id SERIAL PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, approver_id INTEGER NOT NULL REFERENCES users(id), decision VARCHAR(20) NOT NULL CHECK (decision IN ('approved', 'rejected')), comment TEXT, approved_at TIMESTAMP NOT NULL DEFAULT NOW(), UNIQUE(transaction_id, approver_id));`);
 await query(`CREATE TABLE IF NOT EXISTS audit_logs (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), action VARCHAR(100) NOT NULL, entity_type VARCHAR(50) NOT NULL, entity_id INTEGER, detail JSONB, ip_address VARCHAR(100), created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE TABLE IF NOT EXISTS transaction_categories (id SERIAL PRIMARY KEY, cash_type VARCHAR(30) NOT NULL CHECK (cash_type IN ('kas_kecil', 'kas_besar')), name VARCHAR(120) NOT NULL, description TEXT, color VARCHAR(20) NOT NULL DEFAULT '#3B82F6', is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE TABLE IF NOT EXISTS password_reset_tokens (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash VARCHAR(128) NOT NULL, expires_at TIMESTAMP NOT NULL, used_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);
+await query(`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens(token_hash);`);
+await query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`);
+await query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'bendahara', 'approver', 'viewer'));`);
+await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
+await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP NULL;`);
+await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP NULL;`);
+await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;`);
+await query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS proof_file_path TEXT;`);
+
 console.log('Migrations completed');
 }
 async function seed() {
-const users = [['System Admin', 'admin@jakartamax.local', 'admin', 'Admin#12345'], ['Bendahara JMO', 'bendahara@jakartamax.local', 'bendahara', 'Bendahara#12345'], ['Approver 1', 'approver1@jakartamax.local', 'approver', 'Approver#12345'], ['Approver 2', 'approver2@jakartamax.local', 'approver', 'Approver#12345'], ['Approver 3', 'approver3@jakartamax.local', 'approver', 'Approver#12345']];
+const users = [['System Admin', 'admin@jakartamax.local', 'admin', 'Admin#12345'], ['Bendahara JMO', 'bendahara@jakartamax.local', 'bendahara', 'Bendahara#12345'], ['Approver 1', 'approver1@jakartamax.local', 'approver', 'Approver#12345'], ['Approver 2', 'approver2@jakartamax.local', 'approver', 'Approver#12345'], ['Approver 3', 'approver3@jakartamax.local', 'approver', 'Approver#12345'], ['Viewer User', 'viewer@jakartamax.local', 'viewer', 'Viewer#12345']];
 for (const [fullName, email, role, password] of users) { const exists = await query('SELECT id FROM users WHERE email = $1', [email]); if (exists.rows.length === 0) { const passwordHash = await hashPassword(password); await query(`INSERT INTO users (full_name, email, role, password_hash) VALUES ($1,$2,$3,$4)`, [fullName, email, role, passwordHash]); } }
 const admin = await query(`SELECT id FROM users WHERE email='admin@jakartamax.local'`); const bendahara = await query(`SELECT id FROM users WHERE email='bendahara@jakartamax.local'`); const txCount = await query('SELECT COUNT(*)::int AS total FROM transactions');
 if (txCount.rows[0].total === 0) { const sample = [['kas_kecil', 'income', 2500000, 'Donasi', 'Iuran komunitas', '2026-03-01', 'approved', bendahara.rows[0].id], ['kas_kecil', 'expense', 450000, 'Konsumsi', 'Kopi dan snack rapat', '2026-03-02', 'approved', bendahara.rows[0].id], ['kas_besar', 'income', 12000000, 'Sponsorship', 'Sponsor event touring', '2026-03-03', 'approved', admin.rows[0].id], ['kas_besar', 'expense', 3500000, 'Event', 'DP venue gathering', '2026-03-04', 'pending_approval', bendahara.rows[0].id], ['kas_besar', 'expense', 1250000, 'Merchandise', 'Cetak banner komunitas', '2026-03-05', 'approved', admin.rows[0].id]]; for (const item of sample) { await query(`INSERT INTO transactions (cash_type, flow, amount, category, description, transaction_date, status, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, item); } }
+const catCount = await query('SELECT COUNT(*)::int AS total FROM transaction_categories');
+if (catCount.rows[0].total === 0) {
+  const categories = [
+    ['kas_kecil','ATK & Perlengkapan','Alat tulis dan perlengkapan kantor','#F59E0B'],
+    ['kas_kecil','Donasi','Donasi dari anggota atau pihak luar','#3B82F6'],
+    ['kas_kecil','Iuran Anggota','Iuran bulanan anggota','#10B981'],
+    ['kas_kecil','Konsumsi & Catering','Biaya konsumsi kegiatan','#EF4444'],
+    ['kas_kecil','Transport Operasional','Biaya transportasi operasional kecil','#8B5CF6'],
+    ['kas_besar','Biaya Administrasi','Biaya administrasi dan legal','#6366F1'],
+    ['kas_besar','Dana Sosial','Dana untuk kegiatan sosial dan charity','#EC4899'],
+    ['kas_besar','Event & Gathering','Biaya pelaksanaan event dan gathering','#EF4444'],
+    ['kas_besar','Iuran Khusus','Iuran khusus kegiatan besar','#10B981'],
+    ['kas_besar','Pembelian Inventaris','Pembelian barang inventaris klub','#8B5CF6'],
+    ['kas_besar','Sponsorship','Dana dari sponsor kegiatan','#3B82F6'],
+    ['kas_besar','Touring & Perjalanan','Biaya touring dan perjalanan bersama','#F59E0B']
+  ];
+  for (const cat of categories) {
+    await query('INSERT INTO transaction_categories (cash_type, name, description, color) VALUES ($1,$2,$3,$4)', cat);
+  }
+}
 console.log('Seed completed');
 }
-async function main() { const mode = process.argv[2]; try { if (mode === '--migrate') { await runMigrations(); await pool.end(); process.exit(0); } if (mode === '--seed') { await runMigrations(); await seed(); await pool.end(); process.exit(0); } await pool.query('SELECT 1'); app.listen(port, () => { console.log(`Server running on http://localhost:${port}`); }); } catch (error) { console.error(error); process.exit(1); } }
+async function main() {
+  const mode = process.argv[2];
+  try {
+    if (mode === '--migrate') {
+      await runMigrations();
+      await pool.end();
+      process.exit(0);
+    }
+
+    if (mode === '--seed') {
+      await runMigrations();
+      await seed();
+      await pool.end();
+      process.exit(0);
+    }
+
+    const autoMigrate = process.env.AUTO_MIGRATE_ON_START !== 'false';
+    if (autoMigrate) await runMigrations();
+
+    await pool.query('SELECT 1');
+    app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+}
+
 main();

@@ -6,7 +6,7 @@ export async function authRequired(req, res, next) {
   if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const decoded = verifyToken(token);
-    const result = await query('SELECT id, full_name, email, role, is_active FROM users WHERE id = $1', [decoded.userId]);
+    const result = await query('SELECT id, full_name, email, role, is_active FROM users WHERE id = $1 AND deleted_at IS NULL', [decoded.userId]);
     const user = result.rows[0];
     if (!user || !user.is_active) return res.status(401).json({ message: 'User not active' });
     req.user = user; next();
