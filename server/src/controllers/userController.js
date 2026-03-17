@@ -88,3 +88,37 @@ export async function deleteUser(req, res) {
   await writeAuditLog({ userId: req.user.id, action: 'DELETE_USER', entityType: 'USER', entityId: userId, detail: result.rows[0], ipAddress: req.ip });
   res.json({ message: 'User deleted' });
 }
+
+
+export async function adminResetUserPassword(req, res) {
+  const userId = Number(req.params.id);
+  const { newPassword } = req.body;
+
+  if (!newPassword || String(newPassword).length < 8) {
+    return res.status(400).json({ message: 'New password minimum 8 characters' });
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  const result = await query(
+    `UPDATE users
+      SET password_hash = $1,
+          failed_login_attempts = 0,
+          locked_until = NULL
+     WHERE id = $2 AND deleted_at IS NULL
+     RETURNING id, full_name, email`,
+    [passwordHash, userId]
+  );
+
+  if (!result.rows[0]) return res.status(404).json({ message: 'User not found' });
+
+  await writeAuditLog({
+    userId: req.user.id,
+    action: 'ADMIN_RESET_USER_PASSWORD',
+    entityType: 'USER',
+    entityId: userId,
+    detail: { targetUser: result.rows[0].email },
+    ipAddress: req.ip
+  });
+
+  return res.json({ message: 'Password user berhasil direset' });
+}
