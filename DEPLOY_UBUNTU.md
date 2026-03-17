@@ -54,9 +54,11 @@ Edit `.env`:
 
 Build:
 ```bash
-npm install
+npm install --include=dev
 npm run build
 ```
+
+Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket build tool seperti `vite` ikut terpasang.
 
 ## PM2
 ```bash

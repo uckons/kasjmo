@@ -57,7 +57,7 @@ npm run seed
 ## 4) Install frontend
 ```bash
 cd client
-npm install
+npm install --include=dev
 ```
 
 ## Development mode
@@ -77,8 +77,11 @@ npm run dev
 Build frontend:
 ```bash
 cd client
+npm install --include=dev
 npm run build
 ```
+
+Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` memastikan `vite` tersedia saat build.
 
 Start backend:
 ```bash
