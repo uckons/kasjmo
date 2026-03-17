@@ -31,9 +31,10 @@ Edit `.env`:
 - DB_NAME=jmo_finance
 - DB_USER=jmo_user
 - DB_PASSWORD=StrongPassword123!
-- PORT=5700
+- PORT=5800
 - BYPASS_CAPTCHA=false
 - TURNSTILE_SECRET_KEY=...
+- CLIENT_DIST_PATH=/var/www/kasjmo/client/dist
 
 Install and run migration:
 ```bash
@@ -54,9 +55,19 @@ Edit `.env`:
 
 Build:
 ```bash
-npm install
+npm install --include=dev
 npm run build
 ```
+
+Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket build tool seperti `vite` ikut terpasang.
+
+> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh (jangan partial copy), restart service backend, lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+
+> Bila muncul error CSP Turnstile, pastikan backend sudah memakai build terbaru lalu restart service (`pm2 restart jmo-finance`) agar header CSP baru aktif.
+
+> Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
+
+> Pastikan Nginx **tidak** memiliki `location /assets` terpisah yang menunjuk path lama. Semua request `/assets/*` harus menuju backend app yang sama.
 
 ## PM2
 ```bash
@@ -75,7 +86,7 @@ server {
     server_name finance.example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:5700;
+        proxy_pass http://127.0.0.1:5800;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
