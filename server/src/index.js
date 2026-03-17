@@ -17,7 +17,7 @@ import { authRequired } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { pool, query } from './config/db.js';
 import { hashPassword } from './utils/hash.js';
-const app = express(); const port = Number(process.env.PORT || 5700); const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
+const app = express(); const port = Number(process.env.PORT || 5800); const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
 app.use(helmet({ crossOriginResourcePolicy: false })); app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' })); app.use(express.json()); app.use(morgan('dev'));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes); app.use('/api/dashboard', authRequired, dashboardRoutes); app.use('/api/transactions', authRequired, transactionRoutes); app.use('/api/reports', authRequired, reportRoutes); app.use('/api/audit-logs', authRequired, auditRoutes); app.use('/api/users', authRequired, userRoutes);
