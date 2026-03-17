@@ -83,7 +83,9 @@ npm run build
 
 Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` memastikan `vite` tersedia saat build.
 
-> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh (jangan partial copy), restart service backend, lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+
+> Bila muncul error CSP Turnstile, pastikan backend sudah memakai build terbaru lalu restart service (`pm2 restart jmo-finance`) agar header CSP baru aktif.
 
 Start backend:
 ```bash
