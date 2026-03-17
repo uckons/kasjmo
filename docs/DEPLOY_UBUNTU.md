@@ -69,6 +69,8 @@ Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket b
 
 > Pastikan Nginx **tidak** memiliki `location /assets` terpisah yang menunjuk path lama. Semua request `/assets/*` harus menuju backend app yang sama.
 
+> Build terbaru memakai file statis utama `/app.js` dan `/app.css` (bukan wajib `/assets/...`) untuk menghindari bentrok rule Nginx lama pada path `/assets`.
+
 ## PM2
 ```bash
 sudo npm install -g pm2

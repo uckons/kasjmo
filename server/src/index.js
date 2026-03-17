@@ -29,26 +29,29 @@ path.resolve(process.cwd(), 'client/dist'),
 '/var/www/kasjmo/client/dist',
 '/opt/jmo-kas-app/client/dist'
 ].filter(Boolean);
-function parseAssetRefs(indexHtml = '') { return [...indexHtml.matchAll(/(?:src|href)="\/assets\/([^"]+)"/g)].map((m) => m[1]); }
-const distChecks = distCandidates.map((candidate) => { const indexPath = path.join(candidate, 'index.html'); const assetDir = path.join(candidate, 'assets'); const hasIndex = fs.existsSync(indexPath); const hasAssetsDir = fs.existsSync(assetDir); let referencedAssets = []; let allRefsExist = false; if (hasIndex && hasAssetsDir) { const html = fs.readFileSync(indexPath, 'utf8'); referencedAssets = parseAssetRefs(html); allRefsExist = referencedAssets.length > 0 && referencedAssets.every((f) => fs.existsSync(path.join(assetDir, f))); } return { candidate, hasIndex, hasAssetsDir, referencedAssets, allRefsExist }; });
-const resolved = distChecks.find((x) => x.allRefsExist) || distChecks.find((x) => x.hasIndex && x.hasAssetsDir);
+function parseAssetRefs(indexHtml = '') { return [...indexHtml.matchAll(/(?:src|href)="\/([^"]+\.(?:js|css))"/g)].map((m) => m[1]); }
+const distChecks = distCandidates.map((candidate) => { const indexPath = path.join(candidate, 'index.html'); const hasIndex = fs.existsSync(indexPath); let referencedAssets = []; let allRefsExist = false; if (hasIndex) { const html = fs.readFileSync(indexPath, 'utf8'); referencedAssets = parseAssetRefs(html); allRefsExist = referencedAssets.length > 0 && referencedAssets.every((f) => fs.existsSync(path.join(candidate, f))); } return { candidate, hasIndex, referencedAssets, allRefsExist }; });
+const resolved = distChecks.find((x) => x.allRefsExist) || distChecks.find((x) => x.hasIndex);
 const clientDistPath = resolved?.candidate;
 if (clientDistPath) {
-const assetDir = path.join(clientDistPath, 'assets');
 console.log(`Serving frontend from: ${clientDistPath}`);
-app.get('/assets/:file', (req, res, next) => {
-const requested = path.join(assetDir, req.params.file);
-if (fs.existsSync(requested)) return res.sendFile(requested);
-const files = fs.existsSync(assetDir) ? fs.readdirSync(assetDir) : [];
-if (req.params.file.endsWith('.js')) { const fallbackJs = files.find((f) => f === 'app.js') || files.find((f) => /^index-.*\.js$/.test(f)); if (fallbackJs) return res.sendFile(path.join(assetDir, fallbackJs)); }
-if (req.params.file.endsWith('.css')) { const fallbackCss = files.find((f) => f === 'app.css') || files.find((f) => /^index-.*\.css$/.test(f)); if (fallbackCss) return res.sendFile(path.join(assetDir, fallbackCss)); }
+app.get(['/assets/:file', '/:file(app.js|app.css)'], (req, res, next) => {
+const requestedName = req.params.file;
+const requestedDirect = path.join(clientDistPath, requestedName);
+const requestedInAssets = path.join(clientDistPath, 'assets', requestedName);
+if (fs.existsSync(requestedDirect)) return res.sendFile(requestedDirect);
+if (fs.existsSync(requestedInAssets)) return res.sendFile(requestedInAssets);
+const roots = [clientDistPath, path.join(clientDistPath, 'assets')].filter((d) => fs.existsSync(d));
+const files = roots.flatMap((d) => fs.readdirSync(d).map((f) => path.join(d, f)));
+if (requestedName.endsWith('.js')) { const fallbackJs = files.find((f) => /(?:^|\/)app\.js$/.test(f)) || files.find((f) => /(?:^|\/)index-.*\.js$/.test(f)); if (fallbackJs) return res.sendFile(fallbackJs); }
+if (requestedName.endsWith('.css')) { const fallbackCss = files.find((f) => /(?:^|\/)app\.css$/.test(f)) || files.find((f) => /(?:^|\/)index-.*\.css$/.test(f)); if (fallbackCss) return res.sendFile(fallbackCss); }
 return res.status(404).type('text/plain').send('Asset not found');
 });
-app.use(express.static(clientDistPath, { setHeaders: (res, filePath) => { if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); } }));
+app.use(express.static(clientDistPath, { setHeaders: (res, filePath) => { if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); else if (filePath.endsWith('.js') || filePath.endsWith('.css')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); } }));
 app.get('*', (req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); res.sendFile(path.join(clientDistPath, 'index.html')); });
 } else {
 console.warn(`Frontend dist folder not found. Tried: ${distCandidates.join(', ')}`);
-app.get('/assets/:file', (req, res) => res.status(404).type('text/plain').send('Frontend assets unavailable'));
+app.get(['/assets/:file', '/:file(app.js|app.css)'], (req, res) => res.status(404).type('text/plain').send('Frontend assets unavailable'));
 }
 app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates, distChecks }));
 app.use(errorHandler);
