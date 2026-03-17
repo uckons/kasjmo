@@ -17,12 +17,37 @@ import { authRequired } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { pool, query } from './config/db.js';
 import { hashPassword } from './utils/hash.js';
-const app = express(); const port = Number(process.env.PORT || 5700); const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
-app.use(helmet({ crossOriginResourcePolicy: false })); app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' })); app.use(express.json()); app.use(morgan('dev'));
+const app = express(); const port = Number(process.env.PORT || 5800); const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
+app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", 'https://challenges.cloudflare.com'], scriptSrcElem: ["'self'", 'https://challenges.cloudflare.com'], connectSrc: ["'self'", 'https://challenges.cloudflare.com'], frameSrc: ["'self'", 'https://challenges.cloudflare.com'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'], } } })); app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' })); app.use(express.json()); app.use(morgan('dev'));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes); app.use('/api/dashboard', authRequired, dashboardRoutes); app.use('/api/transactions', authRequired, transactionRoutes); app.use('/api/reports', authRequired, reportRoutes); app.use('/api/audit-logs', authRequired, auditRoutes); app.use('/api/users', authRequired, userRoutes);
-const clientDistPath = path.resolve(__dirname, '../../client/dist');
-if (fs.existsSync(clientDistPath)) { app.use(express.static(clientDistPath)); app.get('*', (req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.sendFile(path.join(clientDistPath, 'index.html')); }); }
+const distCandidates = [
+process.env.CLIENT_DIST_PATH,
+path.resolve(__dirname, '../../client/dist'),
+path.resolve(process.cwd(), '../client/dist'),
+path.resolve(process.cwd(), 'client/dist'),
+'/var/www/kasjmo/client/dist',
+'/opt/jmo-kas-app/client/dist'
+].filter(Boolean);
+const clientDistPath = distCandidates.find((p) => fs.existsSync(path.join(p, 'index.html')) && fs.existsSync(path.join(p, 'assets')));
+if (clientDistPath) {
+const assetDir = path.join(clientDistPath, 'assets');
+console.log(`Serving frontend from: ${clientDistPath}`);
+app.get('/assets/:file', (req, res, next) => {
+const requested = path.join(assetDir, req.params.file);
+if (fs.existsSync(requested)) return res.sendFile(requested);
+const files = fs.readdirSync(assetDir);
+if (req.params.file.endsWith('.js')) { const fallbackJs = files.find((f) => f === 'app.js') || files.find((f) => /^index-.*\.js$/.test(f)); if (fallbackJs) return res.sendFile(path.join(assetDir, fallbackJs)); }
+if (req.params.file.endsWith('.css')) { const fallbackCss = files.find((f) => f === 'app.css') || files.find((f) => /^index-.*\.css$/.test(f)); if (fallbackCss) return res.sendFile(path.join(assetDir, fallbackCss)); }
+return res.status(404).type('text/plain').send('Asset not found');
+});
+app.use(express.static(clientDistPath, { setHeaders: (res, filePath) => { if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); } }));
+app.get('*', (req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); res.sendFile(path.join(clientDistPath, 'index.html')); });
+} else {
+console.warn(`Frontend dist folder not found. Tried: ${distCandidates.join(', ')}`);
+app.get('/assets/:file', (req, res) => res.status(404).type('text/plain').send('Frontend assets unavailable'));
+}
+app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates }));
 app.use(errorHandler);
 async function runMigrations() {
 await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);

@@ -6,7 +6,7 @@ A UAT-ready full stack web application for **Kas Kecil** and **Kas Besar** manag
 - Frontend: React + Vite + TailwindCSS + Recharts + Axios + React Router
 - Backend: Node.js + Express + PostgreSQL + JWT
 - Database: PostgreSQL
-- Port: **5700**
+- Port: **5800**
 - Captcha: Cloudflare Turnstile
 
 ## Included features
@@ -57,7 +57,7 @@ npm run seed
 ## 4) Install frontend
 ```bash
 cd client
-npm install
+npm install --include=dev
 ```
 
 ## Development mode
@@ -73,12 +73,21 @@ cd client
 npm run dev
 ```
 
-## Production-like UAT mode (single port 5700)
+## Production-like UAT mode (single port 5800)
 Build frontend:
 ```bash
 cd client
+npm install --include=dev
 npm run build
 ```
+
+Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` memastikan `vite` tersedia saat build.
+
+> Jika setelah deploy muncul error 404 file `/assets/*.js` atau `/assets/*.css`, lakukan deploy ulang folder `client/dist` secara utuh (jangan partial copy), restart service backend, lalu hard refresh browser (Ctrl+F5) untuk menghapus cache asset lama.
+
+> Bila muncul error CSP Turnstile, pastikan backend sudah memakai build terbaru lalu restart service (`pm2 restart jmo-finance`) agar header CSP baru aktif.
+
+> Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
 
 Start backend:
 ```bash
@@ -88,7 +97,7 @@ npm start
 
 Then open:
 ```txt
-http://localhost:5700
+http://localhost:5800
 ```
 
 ## Cloudflare Turnstile
@@ -99,13 +108,14 @@ For production:
 - set `BYPASS_CAPTCHA=false`
 - set `TURNSTILE_SECRET_KEY`
 - set frontend `VITE_TURNSTILE_SITE_KEY`
+- optional: set `CLIENT_DIST_PATH` (contoh: `/var/www/kasjmo/client/dist`) bila backend tidak menemukan folder build frontend otomatis
 
 ## Scripts
 ### Server
 - `npm run dev` - nodemon
 - `npm run migrate` - create tables
 - `npm run seed` - seed users & sample data
-- `npm start` - production server on 5700
+- `npm start` - production server on 5800
 
 ### Client
 - `npm run dev`
