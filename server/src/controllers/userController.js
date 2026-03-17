@@ -1,0 +1,5 @@
+import { query } from '../config/db.js';
+import { hashPassword } from '../utils/hash.js';
+import { writeAuditLog } from '../services/auditService.js';
+export async function listUsers(req, res) { const result = await query(`SELECT id, full_name, email, role, is_active, created_at FROM users ORDER BY id ASC`); res.json(result.rows); }
+export async function createUser(req, res) { const { fullName, email, role, password } = req.body; if (!fullName || !email || !role || !password) return res.status(400).json({ message: 'Missing fields' }); const allowedRoles = ['admin', 'bendahara', 'approver']; if (!allowedRoles.includes(role)) return res.status(400).json({ message: 'Invalid role' }); const passwordHash = await hashPassword(password); const result = await query(`INSERT INTO users (full_name, email, role, password_hash) VALUES ($1,$2,$3,$4) RETURNING id, full_name, email, role, is_active, created_at`, [fullName, email.toLowerCase(), role, passwordHash]); await writeAuditLog({ userId: req.user.id, action: 'CREATE_USER', entityType: 'USER', entityId: result.rows[0].id, detail: result.rows[0], ipAddress: req.ip }); res.status(201).json(result.rows[0]); }
