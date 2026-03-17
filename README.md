@@ -89,6 +89,8 @@ Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` 
 
 > Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
 
+> Pastikan Nginx **tidak** memiliki `location /assets` terpisah yang menunjuk path lama. Semua request `/assets/*` harus menuju backend app yang sama.
+
 Start backend:
 ```bash
 cd ../server

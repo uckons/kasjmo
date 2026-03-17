@@ -29,14 +29,17 @@ path.resolve(process.cwd(), 'client/dist'),
 '/var/www/kasjmo/client/dist',
 '/opt/jmo-kas-app/client/dist'
 ].filter(Boolean);
-const clientDistPath = distCandidates.find((p) => fs.existsSync(path.join(p, 'index.html')) && fs.existsSync(path.join(p, 'assets')));
+function parseAssetRefs(indexHtml = '') { return [...indexHtml.matchAll(/(?:src|href)="\/assets\/([^"]+)"/g)].map((m) => m[1]); }
+const distChecks = distCandidates.map((candidate) => { const indexPath = path.join(candidate, 'index.html'); const assetDir = path.join(candidate, 'assets'); const hasIndex = fs.existsSync(indexPath); const hasAssetsDir = fs.existsSync(assetDir); let referencedAssets = []; let allRefsExist = false; if (hasIndex && hasAssetsDir) { const html = fs.readFileSync(indexPath, 'utf8'); referencedAssets = parseAssetRefs(html); allRefsExist = referencedAssets.length > 0 && referencedAssets.every((f) => fs.existsSync(path.join(assetDir, f))); } return { candidate, hasIndex, hasAssetsDir, referencedAssets, allRefsExist }; });
+const resolved = distChecks.find((x) => x.allRefsExist) || distChecks.find((x) => x.hasIndex && x.hasAssetsDir);
+const clientDistPath = resolved?.candidate;
 if (clientDistPath) {
 const assetDir = path.join(clientDistPath, 'assets');
 console.log(`Serving frontend from: ${clientDistPath}`);
 app.get('/assets/:file', (req, res, next) => {
 const requested = path.join(assetDir, req.params.file);
 if (fs.existsSync(requested)) return res.sendFile(requested);
-const files = fs.readdirSync(assetDir);
+const files = fs.existsSync(assetDir) ? fs.readdirSync(assetDir) : [];
 if (req.params.file.endsWith('.js')) { const fallbackJs = files.find((f) => f === 'app.js') || files.find((f) => /^index-.*\.js$/.test(f)); if (fallbackJs) return res.sendFile(path.join(assetDir, fallbackJs)); }
 if (req.params.file.endsWith('.css')) { const fallbackCss = files.find((f) => f === 'app.css') || files.find((f) => /^index-.*\.css$/.test(f)); if (fallbackCss) return res.sendFile(path.join(assetDir, fallbackCss)); }
 return res.status(404).type('text/plain').send('Asset not found');
@@ -47,7 +50,7 @@ app.get('*', (req, res, next) => { if (req.path.startsWith('/api/')) return next
 console.warn(`Frontend dist folder not found. Tried: ${distCandidates.join(', ')}`);
 app.get('/assets/:file', (req, res) => res.status(404).type('text/plain').send('Frontend assets unavailable'));
 }
-app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates }));
+app.get('/api/frontend-path', (req, res) => res.json({ clientDistPath: clientDistPath || null, distCandidates, distChecks }));
 app.use(errorHandler);
 async function runMigrations() {
 await query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, full_name VARCHAR(150) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'bendahara', 'approver')), password_hash TEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMP NOT NULL DEFAULT NOW());`);

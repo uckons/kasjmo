@@ -67,6 +67,8 @@ Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket b
 
 > Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
 
+> Pastikan Nginx **tidak** memiliki `location /assets` terpisah yang menunjuk path lama. Semua request `/assets/*` harus menuju backend app yang sama.
+
 ## PM2
 ```bash
 sudo npm install -g pm2
