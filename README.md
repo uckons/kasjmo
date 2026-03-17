@@ -87,6 +87,8 @@ Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` 
 
 > Bila muncul error CSP Turnstile, pastikan backend sudah memakai build terbaru lalu restart service (`pm2 restart jmo-finance`) agar header CSP baru aktif.
 
+> Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
+
 Start backend:
 ```bash
 cd ../server

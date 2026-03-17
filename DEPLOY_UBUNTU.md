@@ -65,6 +65,8 @@ Jika server punya `NODE_ENV=production`, opsi `--include=dev` wajib agar paket b
 
 > Bila muncul error CSP Turnstile, pastikan backend sudah memakai build terbaru lalu restart service (`pm2 restart jmo-finance`) agar header CSP baru aktif.
 
+> Cek endpoint `GET /api/frontend-path` untuk memastikan backend membaca path dist frontend yang benar di server.
+
 ## PM2
 ```bash
 sudo npm install -g pm2
