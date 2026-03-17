@@ -15,6 +15,10 @@ function normalizeTransactionPayload(body) {
   };
 }
 
+function resolveStatus(payload) {
+  return payload.cashType === 'kas_besar' && payload.flow === 'expense' ? 'pending_approval' : 'approved';
+}
+
 export async function listTransactions(req, res) {
   const { cashType, flow, status, fromDate, toDate } = req.query;
   const clauses = [];
@@ -49,9 +53,7 @@ export async function createTransaction(req, res) {
     return res.status(400).json({ message: 'Invalid payload' });
   }
 
-  let status = 'approved';
-  const requiresApproval = payload.cashType === 'kas_besar' && payload.flow === 'expense';
-  if (requiresApproval) status = 'pending_approval';
+  const status = resolveStatus(payload);
 
   let proofFilePath = null;
   if (req.body.proofFileBase64 && req.body.proofFileName) {
@@ -65,6 +67,7 @@ export async function createTransaction(req, res) {
     fs.writeFileSync(destination, fileBuffer);
     proofFilePath = `/uploads/transaction-proofs/${filename}`;
   }
+
   const result = await query(
     `INSERT INTO transactions (cash_type, flow, amount, category, description, transaction_date, status, created_by, proof_file_path)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -77,14 +80,42 @@ export async function createTransaction(req, res) {
 
   const approvers = await query(`SELECT full_name, email FROM users WHERE role = 'approver' AND is_active = true`);
   for (const approver of approvers.rows) {
-    await notifyUser({
-      user: approver,
-      subject: `Transaksi baru #${transaction.id}`,
-      body: `Ada transaksi ${transaction.cash_type}/${transaction.flow} senilai ${transaction.amount} yang membutuhkan tindak lanjut.`,
-    });
+    await notifyUser({ user: approver, subject: `Transaksi baru #${transaction.id}`, body: `Ada transaksi ${transaction.cash_type}/${transaction.flow} senilai ${transaction.amount} yang membutuhkan tindak lanjut.` });
   }
 
   res.status(201).json(transaction);
+}
+
+export async function updateTransaction(req, res) {
+  const transactionId = Number(req.params.id);
+  const payload = normalizeTransactionPayload(req.body);
+  if (!payload.cashType || !payload.flow || !payload.amount || payload.amount <= 0) return res.status(400).json({ message: 'Invalid payload' });
+
+  const txResult = await query('SELECT * FROM transactions WHERE id = $1', [transactionId]);
+  const existing = txResult.rows[0];
+  if (!existing) return res.status(404).json({ message: 'Transaction not found' });
+
+  const nextStatus = resolveStatus(payload);
+  const result = await query(
+    `UPDATE transactions
+       SET cash_type = $1, flow = $2, amount = $3, category = $4, description = $5, transaction_date = $6, status = $7
+     WHERE id = $8
+     RETURNING *`,
+    [payload.cashType, payload.flow, payload.amount, payload.category, payload.description, payload.transactionDate, nextStatus, transactionId]
+  );
+
+  if (nextStatus === 'pending_approval') await query('DELETE FROM approvals WHERE transaction_id = $1', [transactionId]);
+
+  await writeAuditLog({ userId: req.user.id, action: 'UPDATE_TRANSACTION', entityType: 'TRANSACTION', entityId: transactionId, detail: result.rows[0], ipAddress: req.ip });
+  res.json(result.rows[0]);
+}
+
+export async function deleteTransaction(req, res) {
+  const transactionId = Number(req.params.id);
+  const result = await query('DELETE FROM transactions WHERE id = $1 RETURNING id, category, amount', [transactionId]);
+  if (!result.rows[0]) return res.status(404).json({ message: 'Transaction not found' });
+  await writeAuditLog({ userId: req.user.id, action: 'DELETE_TRANSACTION', entityType: 'TRANSACTION', entityId: transactionId, detail: result.rows[0], ipAddress: req.ip });
+  res.json({ message: 'Transaction deleted' });
 }
 
 export async function approveTransaction(req, res) {
@@ -105,10 +136,7 @@ export async function approveTransaction(req, res) {
   await query(`INSERT INTO approvals (transaction_id, approver_id, decision, comment, approved_at) VALUES ($1,$2,$3,$4,NOW())`, [transactionId, req.user.id, decision, comment || null]);
 
   const approvals = await query(`SELECT decision, COUNT(*)::int AS total FROM approvals WHERE transaction_id = $1 GROUP BY decision`, [transactionId]);
-  const summary = approvals.rows.reduce((acc, row) => {
-    acc[row.decision] = row.total;
-    return acc;
-  }, {});
+  const summary = approvals.rows.reduce((acc, row) => { acc[row.decision] = row.total; return acc; }, {});
 
   let newStatus = 'pending_approval';
   if ((summary.rejected || 0) > 0) newStatus = 'rejected';
@@ -119,11 +147,7 @@ export async function approveTransaction(req, res) {
 
   const ownerResult = await query('SELECT full_name, email FROM users WHERE id = $1', [transaction.created_by]);
   if (ownerResult.rows[0]) {
-    await notifyUser({
-      user: ownerResult.rows[0],
-      subject: `Status transaksi #${transactionId}: ${newStatus}`,
-      body: `Transaksi Anda sekarang berstatus ${newStatus}.` 
-    });
+    await notifyUser({ user: ownerResult.rows[0], subject: `Status transaksi #${transactionId}: ${newStatus}`, body: `Transaksi Anda sekarang berstatus ${newStatus}.` });
   }
 
   res.json({ message: `Decision saved. Current status: ${newStatus}`, status: newStatus });

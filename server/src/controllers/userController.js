@@ -2,7 +2,7 @@ import { query } from '../config/db.js';
 import { hashPassword } from '../utils/hash.js';
 import { writeAuditLog } from '../services/auditService.js';
 
-const allowedRoles = ['admin', 'bendahara', 'approver'];
+const allowedRoles = ['admin', 'bendahara', 'approver', 'viewer'];
 
 export async function listUsers(req, res) {
   const result = await query(`SELECT id, full_name, email, role, is_active, created_at FROM users WHERE deleted_at IS NULL ORDER BY id ASC`);
