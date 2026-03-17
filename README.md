@@ -22,11 +22,11 @@ A UAT-ready full stack web application for **Kas Kecil** and **Kas Besar** manag
 - Static frontend served by backend in production mode
 
 ## Default UAT accounts
-- `admin@jakartamax.local` / `Admin#12345`
-- `bendahara@jakartamax.local` / `Bendahara#12345`
-- `approver1@jakartamax.local` / `Approver#12345`
-- `approver2@jakartamax.local` / `Approver#12345`
-- `approver3@jakartamax.local` / `Approver#12345`
+- `admin@jakartamax.local` / `!!!Admin#*****!!!`
+- `bendahara@jakartamax.local` / `!!!Admin#*****!!!`
+- `approver1@jakartamax.local` / `!!!Admin#*****!!!`
+- `approver2@jakartamax.local` / `!!!Admin#*****!!!`
+- `approver3@jakartamax.local` / `!!!Admin#*****!!!`
 
 ## Requirements
 - Node.js 20+
