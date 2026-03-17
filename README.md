@@ -6,7 +6,7 @@ A UAT-ready full stack web application for **Kas Kecil** and **Kas Besar** manag
 - Frontend: React + Vite + TailwindCSS + Recharts + Axios + React Router
 - Backend: Node.js + Express + PostgreSQL + JWT
 - Database: PostgreSQL
-- Port: **5700**
+- Port: **5800**
 - Captcha: Cloudflare Turnstile
 
 ## Included features
@@ -57,7 +57,7 @@ npm run seed
 ## 4) Install frontend
 ```bash
 cd client
-npm install
+npm install --include=dev
 ```
 
 ## Development mode
@@ -73,12 +73,15 @@ cd client
 npm run dev
 ```
 
-## Production-like UAT mode (single port 5700)
+## Production-like UAT mode (single port 5800)
 Build frontend:
 ```bash
 cd client
+npm install --include=dev
 npm run build
 ```
+
+Jika environment server menggunakan `NODE_ENV=production`, opsi `--include=dev` memastikan `vite` tersedia saat build.
 
 Start backend:
 ```bash
@@ -88,7 +91,7 @@ npm start
 
 Then open:
 ```txt
-http://localhost:5700
+http://localhost:5800
 ```
 
 ## Cloudflare Turnstile
@@ -105,7 +108,7 @@ For production:
 - `npm run dev` - nodemon
 - `npm run migrate` - create tables
 - `npm run seed` - seed users & sample data
-- `npm start` - production server on 5700
+- `npm start` - production server on 5800
 
 ### Client
 - `npm run dev`
